@@ -117,11 +117,9 @@ const AdmissionEnquiry = () => {
       Email: '',
       Postal_Details: '',
       Class: '',
-      Admission_Date: new Date().toISOString().split('T')[0],
+      Admission_Date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
       Date_of_Birth: '',
       Father_Name: '',
-      Gender: '',
-      Category: '',
     })
     setIsEditing(false)
     setModalVisible(true)
@@ -130,12 +128,9 @@ const AdmissionEnquiry = () => {
   const handleEdit = (enquiry) => {
     const formattedEnquiry = {
       ...enquiry,
-      Admission_Date: enquiry.Admission_Date
-        ? new Date(enquiry.Admission_Date).toISOString().split('T')[0]
-        : '',
-      Date_of_Birth: enquiry.Date_of_Birth
-        ? new Date(enquiry.Date_of_Birth).toISOString().split('T')[0]
-        : '',
+      // Take the first 10 characters (the 'YYYY-MM-DD' part) of the date string
+      Admission_Date: enquiry.Admission_Date ? enquiry.Admission_Date.substring(0, 10) : '',
+      Date_of_Birth: enquiry.Date_of_Birth ? enquiry.Date_of_Birth.substring(0, 10) : '',
     }
     setCurrentEnquiry(formattedEnquiry)
     setIsEditing(true)
@@ -165,17 +160,21 @@ const AdmissionEnquiry = () => {
   const handleFormSubmit = async (e) => {
     e.preventDefault()
     const token = localStorage.getItem('token')
-    const url = isEditing ? `${API_URL}/${currentEnquiry.id}` : API_URL
+    // Correct - each declaration on its own line
+    const url = isEditing ? `${API_URL}/${currentEnquiry.Admission_Number}` : API_URL
+    // Correct
     const method = isEditing ? 'PUT' : 'POST'
-
     try {
+      // Conditionally create the payload: an object for editing, an array for adding.
+      const bodyPayload = isEditing ? currentEnquiry : [currentEnquiry]
+
       const response = await fetch(url, {
         method: method,
         headers: {
           'Content-Type': 'application/json',
           'x-auth-token': token,
         },
-        body: JSON.stringify(currentEnquiry),
+        body: JSON.stringify(bodyPayload),
       })
 
       if (!response.ok) {
@@ -325,12 +324,13 @@ const AdmissionEnquiry = () => {
                         >
                           <CIcon icon={cilPencil} />
                         </CButton>
+
                         <CButton
                           color="danger"
                           size="sm"
                           variant="outline"
                           title="Delete"
-                          onClick={() => handleDelete(item.id)}
+                          onClick={() => handleDelete(item.Admission_Number)} // Use the correct property
                         >
                           <CIcon icon={cilTrash} />
                         </CButton>

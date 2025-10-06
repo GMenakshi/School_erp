@@ -1,198 +1,472 @@
 import React, { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import {
+  CButton,
+  CCard,
+  CCardBody,
+  CCardHeader,
+  CCol,
+  CRow,
+  CFormInput,
+  CFormLabel,
+  CFormSelect,
+  CFormTextarea,
+  CBadge,
+  CButtonGroup,
+  CContainer,
+} from '@coreui/react'
+import CIcon from '@coreui/icons-react'
+import { cilPencil, cilSave, cilX, cilArrowLeft } from '@coreui/icons'
 
-const Profile = () => {
-  const [loggedInStudent, setLoggedInStudent] = useState(null)
-  const [loading, setLoading] = useState(true)
+const Dashboard = () => {
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  // Get student data and mode from navigation state
+  const studentData = location.state?.student
+  const mode = location.state?.mode || 'view'
+
+  const [isEditMode, setIsEditMode] = useState(mode === 'edit')
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [formData, setFormData] = useState(studentData || {})
 
   useEffect(() => {
-    const fetchStudentData = async () => {
-      try {
-        const response = await fetch('https://cosmiccharm.in/api/enquiries')
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
-        const data = await response.json()
-        setLoggedInStudent(data[0]) // Displaying the first student from the API response
-      } catch (e) {
-        setError(e.message)
-      } finally {
-        setLoading(false)
-      }
+    if (!studentData) {
+      // If no student data passed, fetch from API (fallback)
+      fetchStudentData()
+    } else {
+      setFormData(studentData)
     }
+  }, [studentData])
 
-    fetchStudentData()
-  }, [])
+  const fetchStudentData = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch('https://cosmiccharm.in/api/enquiries')
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      const data = await response.json()
+      setFormData(data[0] || {})
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  // Helper function to format date strings
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }))
+  }
+
+  const handleSave = async () => {
+    setLoading(true)
+    try {
+      // Add your save logic here - API call to update student
+      const response = await fetch(`https://cosmiccharm.in/api/enquiries/${formData.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update student data')
+      }
+
+      alert('Student data updated successfully!')
+      setIsEditMode(false)
+    } catch (error) {
+      console.error('Error updating student:', error)
+      alert('Error updating student data: ' + error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCancel = () => {
+    setFormData(studentData) // Reset to original data
+    setIsEditMode(false)
+  }
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A'
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    })
+    try {
+      return new Date(dateString).toISOString().split('T')[0] // Return YYYY-MM-DD format for input
+    } catch (error) {
+      return ''
+    }
   }
 
-  if (loading) {
+  const formatDisplayDate = (dateString) => {
+    if (!dateString) return 'N/A'
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    } catch (error) {
+      return 'Invalid Date'
+    }
+  }
+
+  if (loading && !studentData) {
     return (
-      <div className="profile-container">
-        <div className="profile-card">
-          <div className="profile-grid">
-            <h3 className="info-title">Loading...</h3>
+      <CContainer>
+        <div className="text-center p-4">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
           </div>
+          <div className="mt-2">Loading student data...</div>
         </div>
-      </div>
+      </CContainer>
     )
   }
 
-  if (error) {
+  if (error && !studentData) {
     return (
-      <div className="profile-container">
-        <div className="profile-card">
-          <div className="profile-grid">
-            <h3 className="info-title">Error: {error}</h3>
-          </div>
+      <CContainer>
+        <div className="text-center text-danger p-4">
+          <h5>Error: {error}</h5>
         </div>
-      </div>
+      </CContainer>
     )
   }
 
-  if (!loggedInStudent) {
+  if (!formData || Object.keys(formData).length === 0) {
     return (
-      <div className="profile-container">
-        <div className="profile-card">
-          <div className="profile-grid">
-            <h3 className="info-title">No student data available.</h3>
-          </div>
+      <CContainer>
+        <div className="text-center p-4">
+          <h5>No student data available.</h5>
+          <CButton color="primary" onClick={() => navigate(-1)} className="mt-3">
+            Go Back
+          </CButton>
         </div>
-      </div>
+      </CContainer>
     )
   }
 
   return (
-    <>
-      <style>
-        {`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-        .profile-container{display:flex;justify-content:center;align-items:center;min-height:100vh;padding:3rem;background-color:#121212;color:#E0E0E0;font-family:'Inter',sans-serif}.profile-card{width:100%;max-width:1000px;background-color:#1E1E1E;border-radius:1.5rem;box-shadow:0 10px 30px rgba(0,0,0,.5),0 5px 15px rgba(0,0,0,.3);border:1px solid #333;overflow:hidden;transition:all .3s ease-in-out}.profile-card:hover{box-shadow:0 15px 40px rgba(0,0,0,.7),0 8px 20px rgba(0,0,0,.5);transform:translateY(-5px)}.profile-header{display:flex;flex-direction:column;align-items:center;padding:2.5rem;background:linear-gradient(135deg,#2A2A2A,#1A1A1A);position:relative}@media (min-width:768px){.profile-header{flex-direction:row;justify-content:space-between;align-items:center}}.profile-info{display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:2rem}@media (min-width:768px){.profile-info{flex-direction:row;text-align:left;margin-bottom:0}}.profile-photo-wrapper{position:relative;width:10rem;height:10rem;margin-bottom:1.5rem;flex-shrink:0}@media (min-width:768px){.profile-photo-wrapper{margin-right:2.5rem;margin-bottom:0}}.profile-photo{width:100%;height:100%;border-radius:50%;border:5px solid #FFD700;object-fit:cover;box-shadow:0 0 15px rgba(255,215,0,.4);transition:all .3s ease}.profile-photo:hover{transform:scale(1.05);box-shadow:0 0 25px rgba(255,215,0,.6)}.profile-details-text{display:flex;flex-direction:column}.profile-name{font-size:2.5rem;font-weight:800;line-height:1.2;color:#F5F5F5;letter-spacing:-1px}.profile-admission-no{font-size:1.1rem;color:#B0B0B0;font-weight:400;margin-top:.25rem}.edit-button{display:inline-flex;align-items:center;padding:.75rem 2rem;border:1px solid #FFD700;font-size:.9rem;font-weight:600;border-radius:9999px;color:#FFD700;background:0 0;cursor:pointer;transition:all .3s ease;box-shadow:0 4px 15px rgba(255,215,0,.2)}.edit-button:hover{background-color:#FFD700;color:#121212;transform:translateY(-2px);box-shadow:0 6px 20px rgba(255,215,0,.4)}.edit-button svg{margin-right:.5rem;width:1rem;height:1rem}.profile-grid{padding:2.5rem;display:grid;grid-template-columns:1fr;gap:2rem}@media (min-width:768px){.profile-grid{grid-template-columns:repeat(2,1fr)}}.info-section{background-color:#252525;padding:2rem;border-radius:1rem;box-shadow:inset 0 2px 8px rgba(0,0,0,.4);border:1px solid #333;transition:all .3s ease}.info-section:hover{transform:translateY(-3px);box-shadow:0 8px 25px rgba(0,0,0,.6)}.info-title{font-size:1.25rem;font-weight:700;color:#FFD700;margin-bottom:1.5rem;border-bottom:2px solid #383838;padding-bottom:.75rem;letter-spacing:.5px}.info-list{list-style:none;padding:0;margin:0}.info-list-item{display:flex;justify-content:space-between;align-items:center;padding:1rem 0;border-bottom:1px solid #333}.info-list-item:last-child{border-bottom:none}.info-label{font-weight:600;color:#B0B0B0}.info-value{color:#F5F5F5;font-weight:400;text-align:right}.medical-details-grid{display:grid;grid-template-columns:1fr;gap:1rem}@media (min-width:640px){.medical-details-grid{grid-template-columns:repeat(2,1fr)}}.medical-details-grid .info-list-item{border-bottom:none}.full-width{grid-column:span 1}@media (min-width:768px){.full-width{grid-column:span 2}}
-        `}
-      </style>
-      <div className="profile-container">
-        <div className="profile-card">
-          <div className="profile-header">
-            <div className="profile-info">
-              <div className="profile-photo-wrapper">
-                <img
-                  src={
-                    loggedInStudent.Student_Photo && loggedInStudent.Student_Photo !== 'none'
-                      ? loggedInStudent.Student_Photo
-                      : 'https://placehold.co/150x150/2c3e50/ecf0f1?text=No+Image'
-                  }
-                  alt="Student Profile"
-                  className="profile-photo"
-                  onError={(e) => {
-                    e.target.onerror = null
-                    e.target.src = 'https://placehold.co/150x150/2c3e50/ecf0f1?text=No+Image'
-                  }}
-                />
-              </div>
-              <div className="profile-details-text">
-                <h1 className="profile-name">{`${loggedInStudent.First_Name} ${loggedInStudent.Last_Name}`}</h1>
-                <p className="profile-admission-no">
-                  Admission No: {loggedInStudent.Admission_Number}
-                </p>
+    <CContainer className="mt-4">
+      {/* Header Section */}
+      <CRow className="mb-4">
+        <CCol>
+          <div className="d-flex justify-content-between align-items-center">
+            <div>
+              <h2>Student Dashboard</h2>
+              <div className="text-muted">
+                {isEditMode ? 'Edit Mode' : 'View Mode'} - {formData.First_Name}{' '}
+                {formData.Last_Name}
               </div>
             </div>
-            <button className="edit-button" title="Edit Profile">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                fill="none"
+            <div>
+              {!isEditMode ? (
+                <CButtonGroup>
+                  <CButton color="secondary" variant="outline" onClick={() => navigate(-1)}>
+                    <CIcon icon={cilArrowLeft} className="me-2" />
+                    Back
+                  </CButton>
+                  <CButton color="warning" onClick={() => setIsEditMode(true)}>
+                    <CIcon icon={cilPencil} className="me-2" />
+                    Edit
+                  </CButton>
+                </CButtonGroup>
+              ) : (
+                <CButtonGroup>
+                  <CButton color="secondary" variant="outline" onClick={handleCancel}>
+                    <CIcon icon={cilX} className="me-2" />
+                    Cancel
+                  </CButton>
+                  <CButton color="success" onClick={handleSave} disabled={loading}>
+                    <CIcon icon={cilSave} className="me-2" />
+                    {loading ? 'Saving...' : 'Save'}
+                  </CButton>
+                </CButtonGroup>
+              )}
+            </div>
+          </div>
+        </CCol>
+      </CRow>
+
+      {/* Profile Header Card */}
+      <CCard className="mb-4">
+        <CCardBody>
+          <CRow className="align-items-center">
+            <CCol md={2} className="text-center">
+              <div
+                style={{
+                  width: '120px',
+                  height: '120px',
+                  margin: '0 auto',
+                  borderRadius: '50%',
+                  border: '3px solid #007bff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#f8f9fa',
+                }}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                {formData.Student_Photo && formData.Student_Photo !== 'none' ? (
+                  <img
+                    src={formData.Student_Photo}
+                    alt="Student Profile"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                    }}
+                    onError={(e) => {
+                      e.target.style.display = 'none'
+                      e.target.nextSibling.style.display = 'block'
+                    }}
+                  />
+                ) : null}
+                <div style={{ display: formData.Student_Photo ? 'none' : 'block' }}>No Image</div>
+              </div>
+            </CCol>
+            <CCol md={10}>
+              <h3 className="mb-1">
+                {formData.First_Name} {formData.Last_Name}
+              </h3>
+              <div className="text-muted mb-2">
+                Admission No: <strong>{formData.Admission_Number}</strong>
+              </div>
+              <div className="d-flex gap-2">
+                <CBadge color="primary">Class {formData.Class}</CBadge>
+                <CBadge color="secondary">Section {formData.Section}</CBadge>
+                <CBadge color="info">{formData.Category}</CBadge>
+              </div>
+            </CCol>
+          </CRow>
+        </CCardBody>
+      </CCard>
+
+      {/* Personal Information */}
+      <CRow>
+        <CCol md={6}>
+          <CCard className="mb-4">
+            <CCardHeader>
+              <strong>Personal Information</strong>
+            </CCardHeader>
+            <CCardBody>
+              <CRow className="g-3">
+                <CCol md={6}>
+                  <CFormLabel>First Name</CFormLabel>
+                  {isEditMode ? (
+                    <CFormInput
+                      name="First_Name"
+                      value={formData.First_Name || ''}
+                      onChange={handleInputChange}
+                    />
+                  ) : (
+                    <div className="form-control-plaintext">{formData.First_Name || 'N/A'}</div>
+                  )}
+                </CCol>
+                <CCol md={6}>
+                  <CFormLabel>Last Name</CFormLabel>
+                  {isEditMode ? (
+                    <CFormInput
+                      name="Last_Name"
+                      value={formData.Last_Name || ''}
+                      onChange={handleInputChange}
+                    />
+                  ) : (
+                    <div className="form-control-plaintext">{formData.Last_Name || 'N/A'}</div>
+                  )}
+                </CCol>
+                <CCol md={6}>
+                  <CFormLabel>Roll Number</CFormLabel>
+                  {isEditMode ? (
+                    <CFormInput
+                      name="Roll_Number"
+                      value={formData.Roll_Number || ''}
+                      onChange={handleInputChange}
+                    />
+                  ) : (
+                    <div className="form-control-plaintext">{formData.Roll_Number || 'N/A'}</div>
+                  )}
+                </CCol>
+                <CCol md={6}>
+                  <CFormLabel>Date of Birth</CFormLabel>
+                  {isEditMode ? (
+                    <CFormInput
+                      type="date"
+                      name="Date_of_Birth"
+                      value={formatDate(formData.Date_of_Birth)}
+                      onChange={handleInputChange}
+                    />
+                  ) : (
+                    <div className="form-control-plaintext">
+                      {formatDisplayDate(formData.Date_of_Birth)}
+                    </div>
+                  )}
+                </CCol>
+                <CCol md={6}>
+                  <CFormLabel>Gender</CFormLabel>
+                  {isEditMode ? (
+                    <CFormSelect
+                      name="Gender"
+                      value={formData.Gender || ''}
+                      onChange={handleInputChange}
+                    >
+                      <option value="">Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </CFormSelect>
+                  ) : (
+                    <div className="form-control-plaintext">{formData.Gender || 'N/A'}</div>
+                  )}
+                </CCol>
+                <CCol md={6}>
+                  <CFormLabel>Blood Group</CFormLabel>
+                  {isEditMode ? (
+                    <CFormInput
+                      name="Blood_Group"
+                      value={formData.Blood_Group || ''}
+                      onChange={handleInputChange}
+                    />
+                  ) : (
+                    <div className="form-control-plaintext">{formData.Blood_Group || 'N/A'}</div>
+                  )}
+                </CCol>
+              </CRow>
+            </CCardBody>
+          </CCard>
+        </CCol>
+
+        <CCol md={6}>
+          <CCard className="mb-4">
+            <CCardHeader>
+              <strong>Academic Information</strong>
+            </CCardHeader>
+            <CCardBody>
+              <CRow className="g-3">
+                <CCol md={6}>
+                  <CFormLabel>Class</CFormLabel>
+                  {isEditMode ? (
+                    <CFormSelect
+                      name="Class"
+                      value={formData.Class || ''}
+                      onChange={handleInputChange}
+                    >
+                      <option value="">Select Class</option>
+                      <option value="1">Class 1</option>
+                      <option value="2">Class 2</option>
+                      <option value="3">Class 3</option>
+                      <option value="4">Class 4</option>
+                      <option value="5">Class 5</option>
+                    </CFormSelect>
+                  ) : (
+                    <div className="form-control-plaintext">Class {formData.Class || 'N/A'}</div>
+                  )}
+                </CCol>
+                <CCol md={6}>
+                  <CFormLabel>Section</CFormLabel>
+                  {isEditMode ? (
+                    <CFormSelect
+                      name="Section"
+                      value={formData.Section || ''}
+                      onChange={handleInputChange}
+                    >
+                      <option value="">Select Section</option>
+                      <option value="A">A</option>
+                      <option value="B">B</option>
+                      <option value="C">C</option>
+                    </CFormSelect>
+                  ) : (
+                    <div className="form-control-plaintext">
+                      Section {formData.Section || 'N/A'}
+                    </div>
+                  )}
+                </CCol>
+                <CCol md={12}>
+                  <CFormLabel>Category</CFormLabel>
+                  {isEditMode ? (
+                    <CFormInput
+                      name="Category"
+                      value={formData.Category || ''}
+                      onChange={handleInputChange}
+                    />
+                  ) : (
+                    <div className="form-control-plaintext">{formData.Category || 'N/A'}</div>
+                  )}
+                </CCol>
+                <CCol md={6}>
+                  <CFormLabel>House</CFormLabel>
+                  {isEditMode ? (
+                    <CFormInput
+                      name="House"
+                      value={formData.House || ''}
+                      onChange={handleInputChange}
+                    />
+                  ) : (
+                    <div className="form-control-plaintext">{formData.House || 'N/A'}</div>
+                  )}
+                </CCol>
+              </CRow>
+            </CCardBody>
+          </CCard>
+        </CCol>
+      </CRow>
+
+      {/* Contact Information */}
+      <CCard className="mb-4">
+        <CCardHeader>
+          <strong>Contact Information</strong>
+        </CCardHeader>
+        <CCardBody>
+          <CRow className="g-3">
+            <CCol md={4}>
+              <CFormLabel>Mobile Number</CFormLabel>
+              {isEditMode ? (
+                <CFormInput
+                  name="Mobile_Number"
+                  value={formData.Mobile_Number || ''}
+                  onChange={handleInputChange}
                 />
-              </svg>
-              Edit Profile
-            </button>
-          </div>
-
-          <div className="profile-grid">
-            <div className="info-section">
-              <h3 className="info-title">Personal Information</h3>
-              <ul className="info-list">
-                <li className="info-list-item">
-                  <span className="info-label">Roll No:</span>
-                  <span className="info-value">{loggedInStudent.Roll_Number}</span>
-                </li>
-                <li className="info-list-item">
-                  <span className="info-label">Class:</span>
-                  <span className="info-value">{loggedInStudent.Class}</span>
-                </li>
-                <li className="info-list-item">
-                  <span className="info-label">Date of Birth:</span>
-                  <span className="info-value">{formatDate(loggedInStudent.Date_of_Birth)}</span>
-                </li>
-                <li className="info-list-item">
-                  <span className="info-label">Gender:</span>
-                  <span className="info-value">{loggedInStudent.Gender}</span>
-                </li>
-                <li className="info-list-item">
-                  <span className="info-label">Category:</span>
-                  <span className="info-value">{loggedInStudent.Category}</span>
-                </li>
-              </ul>
-            </div>
-
-            <div className="info-section">
-              <h3 className="info-title">Contact Details</h3>
-              <ul className="info-list">
-                <li className="info-list-item">
-                  <span className="info-label">Mobile Number:</span>
-                  <span className="info-value">{loggedInStudent.Mobile_Number}</span>
-                </li>
-                <li className="info-list-item">
-                  <span className="info-label">Email:</span>
-                  <span className="info-value">{loggedInStudent.Email}</span>
-                </li>
-                <li className="info-list-item">
-                  <span className="info-label">Father's Name:</span>
-                  <span className="info-value">{loggedInStudent.Father_Name}</span>
-                </li>
-              </ul>
-            </div>
-
-            <div className="info-section full-width">
-              <h3 className="info-title">Medical & Other Details</h3>
-              <ul className="info-list medical-details-grid">
-                <li className="info-list-item">
-                  <span className="info-label">House:</span>
-                  <span className="info-value">{loggedInStudent.House}</span>
-                </li>
-                <li className="info-list-item">
-                  <span className="info-label">Blood Group:</span>
-                  <span className="info-value">{loggedInStudent.Blood_Group}</span>
-                </li>
-                <li className="info-list-item">
-                  <span className="info-label">Height:</span>
-                  <span className="info-value">{loggedInStudent.Height}</span>
-                </li>
-                <li className="info-list-item">
-                  <span className="info-label">Weight:</span>
-                  <span className="info-value">{loggedInStudent.Weight}</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
+              ) : (
+                <div className="form-control-plaintext">{formData.Mobile_Number || 'N/A'}</div>
+              )}
+            </CCol>
+            <CCol md={4}>
+              <CFormLabel>Email</CFormLabel>
+              {isEditMode ? (
+                <CFormInput
+                  type="email"
+                  name="Email"
+                  value={formData.Email || ''}
+                  onChange={handleInputChange}
+                />
+              ) : (
+                <div className="form-control-plaintext">{formData.Email || 'N/A'}</div>
+              )}
+            </CCol>
+            <CCol md={4}>
+              <CFormLabel>Father's Name</CFormLabel>
+              {isEditMode ? (
+                <CFormInput
+                  name="Father_Name"
+                  value={formData.Father_Name || ''}
+                  onChange={handleInputChange}
+                />
+              ) : (
+                <div className="form-control-plaintext">{formData.Father_Name || 'N/A'}</div>
+              )}
+            </CCol>
+          </CRow>
+        </CCardBody>
+      </CCard>
+    </CContainer>
   )
 }
 
-export default Profile
+export default Dashboard

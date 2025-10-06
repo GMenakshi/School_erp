@@ -14,6 +14,7 @@ import {
   cilSpeedometer,
   cilStar,
   cilSettings,
+  cilAccountLogout,
 } from '@coreui/icons'
 import { CNavGroup, CNavItem, CNavTitle } from '@coreui/react'
 import { cilMoney } from '@coreui/icons'
@@ -449,6 +450,13 @@ const _nav = [
     name: 'Settings',
     to: '/settings',
     icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
+  },
+
+  {
+    component: CNavItem,
+    name: 'Login',
+    to: '/login',
+    icon: <CIcon icon={cilAccountLogout} customClassName="nav-icon" />,
   },
   // {
   //   component: CNavItem,

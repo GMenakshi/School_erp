@@ -27,24 +27,26 @@ import { cilPencil, cilTrash } from '@coreui/icons'
 const ComplaintsPage = () => {
   // --- Configuration ---
   const BASE_URL = 'https://cosmiccharm.in'
-  const API_URL = `${BASE_URL}/api/complaints`
+  const API_URL = `${BASE_URL}/api/mentors` // Using mentors endpoint as per your backend
 
   // --- State Management ---
   const [complaints, setComplaints] = useState([])
   const [loading, setLoading] = useState(true)
-  const [editingId, setEditingId] = useState(null) // Use null to indicate 'not editing'
+  const [editingId, setEditingId] = useState(null)
+  const [saveLoading, setSaveLoading] = useState(false)
 
   const initialFormState = {
-    Complain_Type: '',
-    Source: '',
-    Complain_By: '',
-    Phone: '',
-    Date: new Date().toISOString().slice(0, 10), // Default to today in YYYY-MM-DD format
-    Description: '',
-    Action_Taken: '',
-    Assigned: '',
-    Note: '',
-    Attached_Document: null,
+    complain_type: '',
+    source: '',
+    complain_by: '',
+    phone: '',
+    complaint_date: new Date().toISOString().slice(0, 10),
+    description: '',
+    action_taken: '',
+    assigned_to: '',
+    note: '',
+    name: '',
+    attachment_path: null,
   }
   const [formData, setFormData] = useState(initialFormState)
 
@@ -57,10 +59,11 @@ const ComplaintsPage = () => {
       const response = await fetch(API_URL)
       if (!response.ok) throw new Error('Failed to fetch complaints.')
       const data = await response.json()
-      setComplaints(data)
+      setComplaints(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Error fetching complaints:', error)
       setComplaints([])
+      alert('Error fetching complaints: ' + error.message)
     } finally {
       setLoading(false)
     }
@@ -92,18 +95,19 @@ const ComplaintsPage = () => {
   const handleEdit = (complaintToEdit) => {
     setEditingId(complaintToEdit.id)
     setFormData({
-      Complain_Type: complaintToEdit.complain_type || '',
-      Source: complaintToEdit.source || '',
-      Complain_By: complaintToEdit.complain_by || '',
-      Phone: complaintToEdit.phone || '',
-      Date: complaintToEdit.complaint_date
+      complain_type: complaintToEdit.complain_type || '',
+      source: complaintToEdit.source || '',
+      complain_by: complaintToEdit.complain_by || '',
+      phone: complaintToEdit.phone || '',
+      complaint_date: complaintToEdit.complaint_date
         ? new Date(complaintToEdit.complaint_date).toISOString().slice(0, 10)
         : '',
-      Description: complaintToEdit.description || '',
-      Action_Taken: complaintToEdit.action_taken || '',
-      Assigned: complaintToEdit.assigned_to || '',
-      Note: complaintToEdit.note || '',
-      Attached_Document: null, // File inputs cannot be programmatically set for security reasons
+      description: complaintToEdit.description || '',
+      action_taken: complaintToEdit.action_taken || '',
+      assigned_to: complaintToEdit.assigned_to || '',
+      note: complaintToEdit.note || '',
+      name: complaintToEdit.name || '',
+      attachment_path: null, // File inputs cannot be programmatically set
     })
   }
 
@@ -113,38 +117,80 @@ const ComplaintsPage = () => {
       try {
         const response = await fetch(`${API_URL}/${id}`, { method: 'DELETE' })
         if (!response.ok) throw new Error('Failed to delete complaint.')
+
+        const result = await response.json()
+        alert('Complaint deleted successfully!')
         fetchComplaints() // Refresh the list
       } catch (error) {
         console.error('Error deleting complaint:', error)
+        alert('Error deleting complaint: ' + error.message)
       }
     }
   }
 
   // Handle the 'Save' or 'Update' button click
   const handleSave = async () => {
-    const dataToSubmit = new FormData()
-    // Append all form data fields to the FormData object
-    for (const key in formData) {
-      dataToSubmit.append(key, formData[key])
+    // Validate required fields
+    if (!formData.complain_type || !formData.source || !formData.complain_by) {
+      alert('Please fill in all required fields (Complaint Type, Source, Complain By)')
+      return
+    }
+
+    setSaveLoading(true)
+
+    // Prepare data for submission (JSON format, not FormData)
+    const dataToSubmit = {
+      complain_type: formData.complain_type,
+      source: formData.source,
+      complain_by: formData.complain_by,
+      phone: formData.phone,
+      complaint_date: formData.complaint_date,
+      description: formData.description,
+      action_taken: formData.action_taken || null,
+      assigned_to: formData.assigned_to || null,
+      note: formData.note || null,
+      name: formData.name || formData.complain_by, // Use complain_by as name if name is empty
+      attachment_path: null, // Handle file upload separately if needed
     }
 
     const isEditing = editingId !== null
-    // NOTE: An UPDATE (PUT) route should be added to your backend to handle editing.
     const url = isEditing ? `${API_URL}/${editingId}` : API_URL
     const method = isEditing ? 'PUT' : 'POST'
 
     try {
       const response = await fetch(url, {
         method: method,
-        body: dataToSubmit,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(dataToSubmit),
       })
 
-      if (!response.ok) throw new Error('Failed to save complaint.')
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to save complaint.')
+      }
+
+      const result = await response.json()
+      alert(isEditing ? 'Complaint updated successfully!' : 'Complaint added successfully!')
 
       resetForm()
       fetchComplaints()
     } catch (error) {
       console.error('Error saving complaint:', error)
+      alert('Error saving complaint: ' + error.message)
+    } finally {
+      setSaveLoading(false)
+    }
+  }
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A'
+    try {
+      return new Date(dateString).toLocaleDateString('en-US')
+    } catch (error) {
+      return 'Invalid Date'
     }
   }
 
@@ -159,52 +205,67 @@ const ComplaintsPage = () => {
           <CCardBody>
             <CRow className="g-3">
               <CCol xs={12}>
-                <CFormLabel>Complaint Type</CFormLabel>
+                <CFormLabel>
+                  Complaint Type <span className="text-danger">*</span>
+                </CFormLabel>
                 <CFormSelect
-                  name="Complain_Type"
-                  value={formData.Complain_Type}
+                  name="complain_type"
+                  value={formData.complain_type}
                   onChange={handleInputChange}
                 >
-                  <option>Select</option>
-                  <option value="Fees">Fees</option>
-                  <option value="Teacher">Teacher</option>
-                  <option value="Sports">Sports</option>
+                  <option value="">Select</option>
+                  <option value="Academic">Academic</option>
+                  <option value="Facility">Facility</option>
+                  <option value="Bullying">Bullying</option>
                   <option value="Transport">Transport</option>
-                  <option value="Study">Study</option>
+                  <option value="Food">Food</option>
+                  <option value="Discipline">Discipline</option>
+                  <option value="Safety">Safety</option>
+                  <option value="Administrative">Administrative</option>
+                  <option value="Cleanliness">Cleanliness</option>
                 </CFormSelect>
               </CCol>
               <CCol xs={12}>
-                <CFormLabel>Source</CFormLabel>
-                <CFormSelect name="Source" value={formData.Source} onChange={handleInputChange}>
-                  <option>Select</option>
+                <CFormLabel>
+                  Source <span className="text-danger">*</span>
+                </CFormLabel>
+                <CFormSelect name="source" value={formData.source} onChange={handleInputChange}>
+                  <option value="">Select</option>
+                  <option value="Student">Student</option>
+                  <option value="Parent">Parent</option>
+                  <option value="Teacher">Teacher</option>
                   <option value="Call">Call</option>
                   <option value="Front Office">Front Office</option>
                 </CFormSelect>
               </CCol>
               <CCol xs={12}>
-                <CFormLabel>Complain By</CFormLabel>
+                <CFormLabel>
+                  Complain By <span className="text-danger">*</span>
+                </CFormLabel>
                 <CFormInput
                   type="text"
-                  name="Complain_By"
-                  value={formData.Complain_By}
+                  name="complain_by"
+                  value={formData.complain_by}
                   onChange={handleInputChange}
+                  placeholder="Enter name of person making complaint"
                 />
               </CCol>
               <CCol xs={12}>
                 <CFormLabel>Phone</CFormLabel>
                 <CFormInput
                   type="tel"
-                  name="Phone"
-                  value={formData.Phone}
+                  name="phone"
+                  value={formData.phone}
                   onChange={handleInputChange}
+                  placeholder="Enter phone number"
                 />
               </CCol>
               <CCol xs={12}>
                 <CFormLabel>Date</CFormLabel>
                 <CFormInput
                   type="date"
-                  name="Date"
-                  value={formData.Date}
+                  name="complaint_date"
+                  value={formData.complaint_date}
                   onChange={handleInputChange}
                 />
               </CCol>
@@ -212,47 +273,66 @@ const ComplaintsPage = () => {
                 <CFormLabel>Description</CFormLabel>
                 <CFormTextarea
                   rows={3}
-                  name="Description"
-                  value={formData.Description}
+                  name="description"
+                  value={formData.description}
                   onChange={handleInputChange}
-                ></CFormTextarea>
+                  placeholder="Describe the complaint in detail"
+                />
               </CCol>
               <CCol xs={12}>
                 <CFormLabel>Action Taken</CFormLabel>
-                <CFormInput
-                  type="text"
-                  name="Action_Taken"
-                  value={formData.Action_Taken}
+                <CFormTextarea
+                  rows={2}
+                  name="action_taken"
+                  value={formData.action_taken}
                   onChange={handleInputChange}
+                  placeholder="What action has been taken to address this complaint"
                 />
               </CCol>
               <CCol xs={12}>
                 <CFormLabel>Assigned</CFormLabel>
                 <CFormInput
                   type="text"
-                  name="Assigned"
-                  value={formData.Assigned}
+                  name="assigned_to"
+                  value={formData.assigned_to}
                   onChange={handleInputChange}
+                  placeholder="Who is assigned to handle this complaint"
                 />
               </CCol>
               <CCol xs={12}>
                 <CFormLabel>Note</CFormLabel>
                 <CFormTextarea
                   rows={3}
-                  name="Note"
-                  value={formData.Note}
+                  name="note"
+                  value={formData.note}
                   onChange={handleInputChange}
-                ></CFormTextarea>
+                  placeholder="Additional notes or comments"
+                />
               </CCol>
               <CCol xs={12}>
                 <CFormLabel>Attach Document</CFormLabel>
-                <CFormInput type="file" name="Attached_Document" onChange={handleInputChange} />
+                <CFormInput
+                  type="file"
+                  name="attachment_path"
+                  onChange={handleInputChange}
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                />
               </CCol>
             </CRow>
           </CCardBody>
           <CCardFooter className="text-end">
-            <CButton color="primary" onClick={handleSave}>
-              {editingId ? 'Update' : 'Save'}
+            {editingId && (
+              <CButton
+                color="secondary"
+                className="me-2"
+                onClick={resetForm}
+                disabled={saveLoading}
+              >
+                Cancel
+              </CButton>
+            )}
+            <CButton color="primary" onClick={handleSave} disabled={saveLoading}>
+              {saveLoading ? 'Saving...' : editingId ? 'Update' : 'Save'}
             </CButton>
           </CCardFooter>
         </CCard>
@@ -261,8 +341,11 @@ const ComplaintsPage = () => {
       {/* Right Column: Complaint List */}
       <CCol md={7}>
         <CCard>
-          <CCardHeader>
+          <CCardHeader className="d-flex justify-content-between align-items-center">
             <strong>Complaint List</strong>
+            <CButton color="secondary" size="sm" onClick={fetchComplaints} disabled={loading}>
+              {loading ? 'Loading...' : 'Refresh'}
+            </CButton>
           </CCardHeader>
           <CCardBody>
             <CTable align="middle" className="mb-0 border" hover responsive>
@@ -280,7 +363,7 @@ const ComplaintsPage = () => {
                 {loading ? (
                   <CTableRow>
                     <CTableDataCell colSpan="6" className="text-center">
-                      Loading...
+                      Loading complaints...
                     </CTableDataCell>
                   </CTableRow>
                 ) : complaints.length === 0 ? (
@@ -293,12 +376,18 @@ const ComplaintsPage = () => {
                   complaints.map((item) => (
                     <CTableRow key={item.id}>
                       <CTableDataCell>{item.id}</CTableDataCell>
-                      <CTableDataCell>{item.complain_type}</CTableDataCell>
-                      <CTableDataCell>{item.complain_by}</CTableDataCell>
-                      <CTableDataCell>{item.phone}</CTableDataCell>
                       <CTableDataCell>
-                        {new Date(item.complaint_date).toLocaleDateString('en-US')}
+                        <div>{item.complain_type}</div>
+                        <div className="small text-muted">Source: {item.source}</div>
                       </CTableDataCell>
+                      <CTableDataCell>
+                        <div>{item.complain_by}</div>
+                        {item.name && item.name !== item.complain_by && (
+                          <div className="small text-muted">{item.name}</div>
+                        )}
+                      </CTableDataCell>
+                      <CTableDataCell>{item.phone || 'N/A'}</CTableDataCell>
+                      <CTableDataCell>{formatDate(item.complaint_date)}</CTableDataCell>
                       <CTableDataCell className="text-center">
                         <CButtonGroup>
                           <CButton
@@ -307,6 +396,7 @@ const ComplaintsPage = () => {
                             variant="outline"
                             title="Edit"
                             onClick={() => handleEdit(item)}
+                            disabled={saveLoading}
                           >
                             <CIcon icon={cilPencil} />
                           </CButton>
@@ -316,6 +406,7 @@ const ComplaintsPage = () => {
                             variant="outline"
                             title="Delete"
                             onClick={() => handleDelete(item.id)}
+                            disabled={saveLoading}
                           >
                             <CIcon icon={cilTrash} />
                           </CButton>
@@ -328,13 +419,16 @@ const ComplaintsPage = () => {
             </CTable>
           </CCardBody>
           <CCardFooter>
-            <CPagination align="end">
-              <CPaginationItem disabled>Previous</CPaginationItem>
-              <CPaginationItem active>1</CPaginationItem>
-              <CPaginationItem>2</CPaginationItem>
-              <CPaginationItem>3</CPaginationItem>
-              <CPaginationItem>Next</CPaginationItem>
-            </CPagination>
+            <div className="d-flex justify-content-between align-items-center">
+              <div className="small text-muted">
+                Showing {complaints.length} complaint{complaints.length !== 1 ? 's' : ''}
+              </div>
+              <CPagination align="end">
+                <CPaginationItem disabled>Previous</CPaginationItem>
+                <CPaginationItem active>1</CPaginationItem>
+                <CPaginationItem>Next</CPaginationItem>
+              </CPagination>
+            </div>
           </CCardFooter>
         </CCard>
       </CCol>
